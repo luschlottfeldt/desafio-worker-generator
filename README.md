@@ -8,17 +8,17 @@ Este sistema foi projetado para a geração assíncrona de relatórios nos forma
 ## 🏛️ Arquitetura Proposta
 
 ### **Fluxo de Requisição**
-1. O cliente envia uma requisição **`POST /generate`** para solicitar um novo relatório.
-2. A requisição passa pelo **API Gateway**, que roteia para uma **AWS Lambda** do **Report Service (NestJS)**.
+1. O cliente envia uma requisição **`POST /generate`** para solicitar a criação de um novo relatório.
+2. A requisição passa pelo **API Gateway**, que roteia para uma **AWS Lambda** construída com **NestJS**.
 3. O serviço valida a solicitação, armazena um registro inicial no **PostgreSQL/MySQL** e publica uma mensagem na fila do **AmazonMQ**.
-4. Uma **AWS Lambda Worker** consome a mensagem, gera o relatório (XLSX/PDF) e armazena no **S3 (ou similar)**.
+4. Um **Worker (Lambda)** consome a mensagem, gera o relatório (XLSX/PDF) e armazena no **S3**.
 5. O Worker atualiza o status do relatório no **banco de dados**.
 6. O cliente pode consultar o status pelo endpoint **`GET /status/{id}`**, passando novamente pelo **API Gateway**.
-7. Quando o relatório estiver pronto, um link para download é retornado.
+7. Quando o relatório estiver pronto, um link para download é retornado (Email, push, etc...).
 
 ### **Componentes Principais**
-- **API Gateway**: Gerencia o tráfego das requisições HTTP e invoca as Lambdas corretas.
-- **Report Service (Lambda NestJS)**: Processa as requisições e interage com AmazonMQ e o banco de dados.
+- **API Gateway**: Gerencia o tráfego das requisições HTTP e engatilha as Lambdas.
+- **Report Service (NestJS)**: Processa as requisições e interage com AmazonMQ e o banco de dados.
 - **AmazonMQ**: Gerencia a fila de processamento assíncrono.
 - **Worker de Geração (Lambda)**: Responsável por processar os arquivos e armazená-los.
 - **Banco de Dados (PostgreSQL/MySQL)**: Armazena o estado da geração dos relatórios.
@@ -34,8 +34,8 @@ Este sistema foi projetado para a geração assíncrona de relatórios nos forma
 | **Latência**         | Muito baixa (TCP) | Maior (HTTP) |
 | **Controle**         | Maior flexibilidade para **routing e reprocessamento** | Simples, sem suporte avançado a routing |
 | **Persistência**     | Controle total sobre expiração e reentrega | Fila pode reter mensagens até 14 dias |
-| **Escalabilidade**   | Requer configuração manual | Escala automaticamente |
-| **Complexidade**     | Requer deploy e tuning | Simples e gerenciado pela AWS |
+| **Escalabilidade**   | Requer configuração manual para escalabilidade | Escala automaticamente |
+| **Complexidade**     | Gerenciado pela AWS, mas requer configuração de instâncias | Simples e gerenciado pela AWS |
 
 Decidimos utilizar o **AmazonMQ** porque:
 - O sistema exige **baixa latência** e **entrega rápida de mensagens**.
@@ -56,7 +56,7 @@ Se a necessidade fosse **escalabilidade infinita sem gerenciamento**, o **SQS se
 - **Retries e Dead Letter Queue (DLQ)**: Em caso de falha, as mensagens são reenviadas ou movidas para uma fila de erros para análise posterior.
 
 ### **Cache e Performance**
-- **Redis como Cache**: Utilizado para armazenar estados temporários e evitar consultas desnecessárias ao banco de dados.
+- **Redis como Cache**: Possibilidade de uso para armazenar estados temporários e evitar consultas desnecessárias ao banco de dados.
 - **CDN para Download**: Os arquivos podem ser entregues via **CloudFront**, garantindo baixa latência no acesso aos relatórios.
 
 ---
